@@ -40,7 +40,7 @@
 //
 // remove comment slashes on line below to enable real time clock support
 //
-//#define USE_RTC
+#define USE_RTC
 
 // ----------------------------------------------------------------------------
 //
@@ -62,7 +62,10 @@ void
 	Snooze( void ),
 	ProcessButtons( void ),
 	GetCurrentTime( void ),
-	SystemClock_Config( void );
+	SystemClock_Config( void ),
+	ConfigureIoPins( void ),
+	ConfigureTimer( void ),
+	ConfigureRealTimeClock( void );
 
 
 uint16_t
@@ -115,28 +118,11 @@ volatile int
 	AlarmPmFlag = 0,
 	TimePmFlag = 0;
 
-
 void ConfigureDisplay( void )
 {
-//	GPIO_InitTypeDef
-//		GPIO_InitStructure;
-
-//
-//  Enable clocks for PWR_CLK for RTC, GPIOE, GPIOD, GPIOC and TIM5.
-//
-
-//
-// Enable the LED multiplexing display and push button timer (TIM5) at a frequency of 250Hz
-//
-
-//
-// Configure the 7 segments, 5 digit controls and alarm signal as outputs
-//
-
-//
-// Configure the push button switches ( maximum 6 ) as inputs with pull-ups
-//
-
+	ConfigureIoPins();
+	ConfigureTimer();
+//	ConfigureRealTimeClock();
 }
 
 
@@ -188,6 +174,7 @@ int main(int argc, char* argv[])
 //
 // Start the display timer (TIM5)
 //
+	__HAL_TIM_ENABLE( &DisplayTimer ); // Enable timer to start
 
 
 	while ( TRUE )
@@ -251,7 +238,7 @@ void SystemClock_Config(void)
 
 
 /*
- * Function: TIM5_IRQHandler
+ * Function: TIM3_IRQHandler
  *
  * Description:
  *
@@ -265,7 +252,7 @@ void SystemClock_Config(void)
  */
 
 
-void TIM5_IRQHandler(void)
+void TIM3_IRQHandler(void)
 {
 
 //
@@ -432,7 +419,7 @@ void SetAlarm(void)
 		if ( ClockAlarm.AlarmTime.Hours >= 12 ){
 			ClockAlarm.AlarmTime.Hours %= 12;
 		}
-
+	}
 	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 }
 
@@ -541,6 +528,192 @@ void ProcessButtons( void )
 {
 }
 
+// ----------------------------------------------------------------------------
+// Initialization functions
+
+void ConfigureIoPins(){
+//
+// Configure the 7 segments, 5 digit controls and alarm signal as outputs
+//
+	__HAL_RCC_GPIOE_CLK_ENABLE(); // enabling clock for port E
+
+	GPIO_InitTypeDef GPIOE_InitStructure; // handle for pointing GPIO of port E
+
+	GPIOE_InitStructure.Pin = PIN_ALL_DIGITS|PIN_ALL_SEGMENTS;
+	GPIOE_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIOE_InitStructure.Speed = GPIO_SPEED_LOW;
+	GPIOE_InitStructure.Pull = GPIO_NOPULL;
+	GPIOE_InitStructure.Alternate = 0;
+
+	HAL_GPIO_Init(GPIOE, &GPIOE_InitStructure);
+
+//
+// Configure the push button switches ( maximum 6 ) as inputs with pull-ups
+//
+	__HAL_RCC_GPIOD_CLK_ENABLE(); // enabling clock for port D
+
+	GPIO_InitTypeDef GPIO_InitStructureD; // handle for pointing GPIO of port D
+
+	GPIO_InitStructureD.Pin = PIN_ALL_BUTTONS;
+	GPIO_InitStructureD.Mode = GPIO_MODE_INPUT; // set mode to be input
+	GPIO_InitStructureD.Speed = GPIO_SPEED_FAST;
+	GPIO_InitStructureD.Pull = GPIO_PULLUP; // configure pull-up resistor
+	GPIO_InitStructureD.Alternate = 0;
+
+	HAL_GPIO_Init(GPIOD, &GPIO_InitStructureD);
+
+//
+// Configure port C pin 6 to act as Timer 3 (alternate function)
+//
+	__HAL_RCC_GPIOC_CLK_ENABLE(); // enabling clock for port C
+
+	GPIO_InitTypeDef GPIOC_InitStructure; //A handle to initialize GPIO port C
+
+	GPIOC_InitStructure.Pin = GPIO_PIN_6;
+	GPIOC_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIOC_InitStructure.Speed = GPIO_SPEED_HIGH;
+	GPIOC_InitStructure.Pull = GPIO_NOPULL;
+	GPIOC_InitStructure.Alternate = GPIO_AF2_TIM3;// TIM_3 as alternate function
+
+	HAL_GPIO_Init(GPIOC, &GPIOC_InitStructure);
+}
+
+void ConfigureTimer()
+{
+//
+// Enable the LED multiplexing display and push button timer (TIM5) at a frequency of 250Hz
+//
+	__HAL_RCC_TIM3_CLK_ENABLE();
+	DisplayTimer.Instance = TIM3;
+	DisplayTimer.Init.Period = 39; // period & prescaler combination for 0.004 seconds count (ie 250 Hz)
+	DisplayTimer.Init.Prescaler = 8399;
+	DisplayTimer.Init.CounterMode = TIM_COUNTERMODE_UP;
+	DisplayTimer.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	HAL_TIM_Base_Init( &DisplayTimer );
+
+	HAL_NVIC_SetPriority( TIM3_IRQn, 0, 0); // set priority for the interrupt. Value 0 corresponds to highest priority
+	HAL_NVIC_EnableIRQ( TIM3_IRQn ); // Enable interrupt function request of Timer3
+
+	__HAL_TIM_ENABLE_IT( &DisplayTimer, TIM_IT_UPDATE ); // Enable timer interrupt flag to be set when timer count is reached
+	// Note: The timer has not been started yet, as doing so this early will
+	// cause an unhandled interrupt to occur.
+}
+
+void ConfigureRealTimeClock( void )
+{
+	RCC_OscInitTypeDef
+		RCC_OscInitStruct;
+
+	RCC_PeriphCLKInitTypeDef
+		PeriphClkInitStruct;
+
+//
+// Configure LSI as RTC clock source
+//
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+	RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+
+	if( HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK )
+	{
+		trace_printf( "HAL_RCC_OscConfig failed\r\n");
+		while( TRUE );
+	}
+
+
+
+//
+// Assign the LSI clock to the RTC
+//
+	PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+	if(HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+	{
+		trace_printf( "HAL_RCCEx_PeriphCLKConfig failed\r\n");
+		while( TRUE );
+	}
+
+//
+// Enable the RTC
+//
+	__HAL_RCC_RTC_ENABLE();
+
+//
+// Configure the RTC format and clock divisor
+//
+
+	RealTimeClock.Instance = RTC;
+	RealTimeClock.Init.HourFormat = RTC_HOURFORMAT_12;
+
+	RealTimeClock.Init.AsynchPrediv = 127;
+	RealTimeClock.Init.SynchPrediv = 0xFF;
+	RealTimeClock.Init.OutPut = RTC_OUTPUT_DISABLE;
+	RealTimeClock.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+	RealTimeClock.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+	HAL_RTC_Init(&RealTimeClock );
+
+//
+// Disable the write protection for RTC registers
+//
+	__HAL_RTC_WRITEPROTECTION_DISABLE( &RealTimeClock );
+
+//
+// Disable the Alarm A interrupt
+//
+	__HAL_RTC_ALARMA_DISABLE( &RealTimeClock );
+
+//
+// Clear flag alarm A
+//
+	__HAL_RTC_ALARM_CLEAR_FLAG(&RealTimeClock, RTC_FLAG_ALRAF);
+
+	//
+	// Structure to set the time in the RTC
+	//
+		ClockTime.Hours = 00;
+		ClockTime.Minutes = 00;
+		ClockTime.Seconds = 00;
+		ClockTime.SubSeconds = 0;
+		ClockTime.TimeFormat = RTC_HOURFORMAT_12;
+		ClockTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+		ClockTime.StoreOperation = RTC_STOREOPERATION_RESET;
+
+	//
+	// Structure to set the date in the RTC
+	//
+
+	 	ClockDate.Date = 	21;
+		ClockDate.Month = 	RTC_MONTH_JUNE;
+		ClockDate.WeekDay = RTC_WEEKDAY_WEDNESDAY;
+		ClockDate.Year =	17;
+
+	//
+	// Set the date and time in the RTC
+	//
+
+		HAL_RTC_SetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
+		HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
+
+
+
+		HAL_NVIC_SetPriority( RTC_Alarm_IRQn, 0, 0 );
+		HAL_NVIC_EnableIRQ( RTC_Alarm_IRQn );
+
+
+	//
+	// Set the initial alarm time
+	//
+		ClockAlarm.Alarm = RTC_ALARM_A;
+		ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
+		ClockAlarm.AlarmTime.Hours = 0x00;
+		ClockAlarm.AlarmTime.Minutes = 0x00;
+		ClockAlarm.AlarmTime.Seconds = 0x05;
+		ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
+		ClockAlarm.AlarmDateWeekDay = 1;
+		HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
+}
+
+// ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic pop
 
