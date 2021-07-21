@@ -33,8 +33,12 @@
 // Button inputs should all be on GPIOD
 #define PIN_BUT_1 GPIO_PIN_0
 #define PIN_BUT_2 GPIO_PIN_1
-#define PIN_BUT_3 GPIO_PIN_3
-#define PIN_BUT_4 GPIO_PIN_6
-#define PIN_BUT_5 GPIO_PIN_7
-#define PIN_BUT_6 GPIO_PIN_8
+#define PIN_BUT_3 GPIO_PIN_2
+#define PIN_BUT_4 GPIO_PIN_3
+#define PIN_BUT_5 GPIO_PIN_6
+#define PIN_BUT_6 GPIO_PIN_7
 #define PIN_ALL_BUTTONS (PIN_BUT_1 | PIN_BUT_2 | PIN_BUT_3 | PIN_BUT_4 | PIN_BUT_5 | PIN_BUT_6)
+
+// Number of "cycles" to wait before updating a button input (used to determine
+// a button value is stable while debouncing)
+#define BUTTON_STAB_COUNT 10

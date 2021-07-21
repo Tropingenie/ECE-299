@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "diag/Trace.h"
 #include "stm32f4xx_hal.h"
 #include "Timer.h"
@@ -104,10 +105,15 @@ TIM_HandleTypeDef
 
 volatile int
 	Alarm = FALSE,			// Flag indicating alarm
-	DebounceCount = 0;		// Buttons debounce count
+	Button_Debounce_Counter[6] = {BUTTON_STAB_COUNT,	// Button debounce counters
+								  BUTTON_STAB_COUNT,
+								  BUTTON_STAB_COUNT,
+								  BUTTON_STAB_COUNT,
+								  BUTTON_STAB_COUNT,
+								  BUTTON_STAB_COUNT};
 
-volatile uint16_t
-	ButtonsPushed;			// Bit field containing the bits of which buttons have been pushed
+volatile bool
+	ButtonsPushed[6];			// Bit field containing the bits of which buttons have been pushed
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -122,7 +128,7 @@ void ConfigureDisplay( void )
 {
 	ConfigureIoPins();
 	ConfigureTimer();
-//	ConfigureRealTimeClock();
+	ConfigureRealTimeClock();
 }
 
 
@@ -137,7 +143,7 @@ int main(int argc, char* argv[])
 //
 // Configure the system clock
 //
-	SystemClock_Config();
+//	SystemClock_Config(); // New library calls this before main
 
 //
 // Display project name with version number
@@ -188,57 +194,11 @@ int main(int argc, char* argv[])
 	}
 }
 
-/*
- *
- *  System Clock Configuration
- *
- */
 
-void SystemClock_Config(void)
-{
-
-	RCC_OscInitTypeDef RCC_OscInitStruct;
-	RCC_ClkInitTypeDef RCC_ClkInitStruct;
-	RCC_PeriphCLKInitTypeDef PeriphClkInitStruct;
-
-	__HAL_RCC_PWR_CLK_ENABLE();
-
-	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-	RCC_OscInitStruct.PLL.PLLM = 4;
-	RCC_OscInitStruct.PLL.PLLN = 168;
-	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-	RCC_OscInitStruct.PLL.PLLQ = 7;
-	HAL_RCC_OscConfig(&RCC_OscInitStruct);
-
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-			|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-	HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
-
-	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
-	PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
-	PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
-	HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
-
-	HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-
-	HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-
-	/* SysTick_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-}
 
 
 /*
- * Function: TIM3_IRQHandler
+ * Function: TIM5_IRQHandler
  *
  * Description:
  *
@@ -252,7 +212,7 @@ void SystemClock_Config(void)
  */
 
 
-void TIM3_IRQHandler(void)
+void TIM5_IRQHandler(void)
 {
 
 //
@@ -276,7 +236,9 @@ void TIM3_IRQHandler(void)
 //
 // Debug code
 //
-//			trace_printf( "%04X\n", ButtonsPushed );
+			trace_printf( "B1:%d B2:%d B3:%d B4:%d B5:%d B6:%d\n",
+					ButtonsPushed[0], ButtonsPushed[1], ButtonsPushed[2],
+					ButtonsPushed[3], ButtonsPushed[4], ButtonsPushed[5]);
 
 			ProcessButtons();
 		}
@@ -472,29 +434,33 @@ void Snooze(void)
 
 void GetCurrentTime(void)
 {
-	int hour_tens = 0, hours = 0, minute_tens = 0, minutes = 0;
-	if ( HAL_RTC_WaitForSynchro( &RealTimeClock ) == HAL_OK ){
-		// Update the time and date structures
-		HAL_RTC_GetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
-		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
-
-		// Extract the value to set each digit
-		hours = ClockTime.Hours;
-		while(hours >= 10){
-			hours -= 10;
-			hour_tens++;
-		}
-		minutes = ClockTime.Minutes;
-		while(minutes >= 10){
-			minutes -= 10;
-			minute_tens++;
-		}
-	}
-	// Set the digits in the BCDTime array
-	BcdTime[0] = hour_tens;
-	BcdTime[1] = hours;
-	BcdTime[2] = minute_tens;
-	BcdTime[3] = minutes;
+//	int hour_tens = 0, hours = 0, minute_tens = 0, minutes = 0;
+//	if ( HAL_RTC_WaitForSynchro( &RealTimeClock ) == HAL_OK ){
+//		// Update the time and date structures
+//		HAL_RTC_GetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
+//		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
+//
+//		// Extract the value to set each digit
+//		hours = ClockTime.Hours;
+//		while(hours >= 10){
+//			hours -= 10;
+//			hour_tens++;
+//		}
+//		minutes = ClockTime.Minutes;
+//		while(minutes >= 10){
+//			minutes -= 10;
+//			minute_tens++;
+//		}
+//	}
+//	// Set the digits in the BCDTime array
+//	BcdTime[0] = hour_tens;
+//	BcdTime[1] = hours;
+//	BcdTime[2] = minute_tens;
+//	BcdTime[3] = minutes;
+	BcdTime[0] = 1;
+	BcdTime[1] = 2;
+	BcdTime[2] = 3;
+	BcdTime[3] = 8;
 }
 
 
@@ -510,7 +476,41 @@ void GetCurrentTime(void)
 
 uint16_t CheckButtons( void )
 {
+	// First, check the current value of the buttons
+	bool button_current_value[6] = {HAL_GPIO_ReadPin(GPIOD, PIN_BUT_1),
+									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_2),
+									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_3),
+									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_4),
+									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_5),
+									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_6)};
 
+	for(unsigned char button = 0; button < 6; button++){
+		if (button_current_value[button] != ButtonsPushed[button]){
+			// If the value returned has changed from the stored value
+			if(Button_Debounce_Counter[button] == 0){
+				// Once the counter reaches zero, the value should have stabilized
+				// Update the state of the button to what it has stabilized to
+				ButtonsPushed[button] = button_current_value[button];
+				Button_Debounce_Counter[button] = BUTTON_STAB_COUNT;
+			}
+			else{
+				// Decrement the counter to wait until the return of ReadPin is stable
+				Button_Debounce_Counter[button]--;
+			}
+		}
+		else{
+			// Reset the counter--the value is either not very stable, or has not changed
+			Button_Debounce_Counter[button] = BUTTON_STAB_COUNT;
+		}
+	}
+
+	// If any of the button values are true, return TRUE
+	for(unsigned char button = 0; button < 6; button++){
+		if(ButtonsPushed[button]){
+			return( TRUE );
+		}
+	}
+	// Otherwise return false
 	return( FALSE );
 }
 
@@ -526,12 +526,76 @@ uint16_t CheckButtons( void )
 
 void ProcessButtons( void )
 {
+
 }
+
+
 
 // ----------------------------------------------------------------------------
 // Initialization functions
 
-void ConfigureIoPins(){
+/*
+ *
+ *  System Clock Configuration
+ *
+ */
+
+void SystemClock_Config( void )
+{
+
+	RCC_OscInitTypeDef RCC_OscInitStruct;
+	RCC_ClkInitTypeDef RCC_ClkInitStruct;
+	RCC_PeriphCLKInitTypeDef PeriphClkInitStruct;
+
+	__HAL_RCC_PWR_CLK_ENABLE();
+
+	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+	RCC_OscInitStruct.PLL.PLLM = 4;
+	RCC_OscInitStruct.PLL.PLLN = 168;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+	RCC_OscInitStruct.PLL.PLLQ = 7;
+	if( HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK )
+	{
+		trace_printf( "HAL_RCC_OscConfig failed\r\n");
+		while( TRUE );
+	}
+
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+			|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+	if( HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK )
+	{
+		trace_printf( "HAL_RCC_ClockConfig failed\r\n");
+		while( TRUE );
+	}
+
+	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
+	PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
+	PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
+	if(HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+	{
+		trace_printf( "HAL_RCCEx_PeriphCLKConfig failed\r\n");
+		while( TRUE );
+	}
+
+
+	HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+
+	HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+
+	/* SysTick_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+}
+
+void ConfigureIoPins( void ){
 //
 // Configure the 7 segments, 5 digit controls and alarm signal as outputs
 //
@@ -563,7 +627,7 @@ void ConfigureIoPins(){
 	HAL_GPIO_Init(GPIOD, &GPIO_InitStructureD);
 
 //
-// Configure port C pin 6 to act as Timer 3 (alternate function)
+// Configure port C pin 6 to act as Timer 5 (alternate function)
 //
 	__HAL_RCC_GPIOC_CLK_ENABLE(); // enabling clock for port C
 
@@ -573,26 +637,26 @@ void ConfigureIoPins(){
 	GPIOC_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIOC_InitStructure.Speed = GPIO_SPEED_HIGH;
 	GPIOC_InitStructure.Pull = GPIO_NOPULL;
-	GPIOC_InitStructure.Alternate = GPIO_AF2_TIM3;// TIM_3 as alternate function
+	GPIOC_InitStructure.Alternate = GPIO_AF2_TIM5;// TIM_5 as alternate function
 
 	HAL_GPIO_Init(GPIOC, &GPIOC_InitStructure);
 }
 
-void ConfigureTimer()
+void ConfigureTimer( void )
 {
 //
 // Enable the LED multiplexing display and push button timer (TIM5) at a frequency of 250Hz
 //
-	__HAL_RCC_TIM3_CLK_ENABLE();
-	DisplayTimer.Instance = TIM3;
+	__HAL_RCC_TIM5_CLK_ENABLE();
+	DisplayTimer.Instance = TIM5;
 	DisplayTimer.Init.Period = 39; // period & prescaler combination for 0.004 seconds count (ie 250 Hz)
 	DisplayTimer.Init.Prescaler = 8399;
 	DisplayTimer.Init.CounterMode = TIM_COUNTERMODE_UP;
 	DisplayTimer.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	HAL_TIM_Base_Init( &DisplayTimer );
 
-	HAL_NVIC_SetPriority( TIM3_IRQn, 0, 0); // set priority for the interrupt. Value 0 corresponds to highest priority
-	HAL_NVIC_EnableIRQ( TIM3_IRQn ); // Enable interrupt function request of Timer3
+	HAL_NVIC_SetPriority( TIM5_IRQn, 0, 0); // set priority for the interrupt. Value 0 corresponds to highest priority
+	HAL_NVIC_EnableIRQ( TIM5_IRQn ); // Enable interrupt function request of Timer3
 
 	__HAL_TIM_ENABLE_IT( &DisplayTimer, TIM_IT_UPDATE ); // Enable timer interrupt flag to be set when timer count is reached
 	// Note: The timer has not been started yet, as doing so this early will
@@ -620,8 +684,6 @@ void ConfigureRealTimeClock( void )
 		while( TRUE );
 	}
 
-
-
 //
 // Assign the LSI clock to the RTC
 //
@@ -643,7 +705,7 @@ void ConfigureRealTimeClock( void )
 //
 
 	RealTimeClock.Instance = RTC;
-	RealTimeClock.Init.HourFormat = RTC_HOURFORMAT_12;
+	RealTimeClock.Init.HourFormat = RTC_HOURFORMAT_24;
 
 	RealTimeClock.Init.AsynchPrediv = 127;
 	RealTimeClock.Init.SynchPrediv = 0xFF;
@@ -667,53 +729,52 @@ void ConfigureRealTimeClock( void )
 //
 	__HAL_RTC_ALARM_CLEAR_FLAG(&RealTimeClock, RTC_FLAG_ALRAF);
 
-	//
-	// Structure to set the time in the RTC
-	//
-		ClockTime.Hours = 00;
-		ClockTime.Minutes = 00;
-		ClockTime.Seconds = 00;
-		ClockTime.SubSeconds = 0;
-		ClockTime.TimeFormat = RTC_HOURFORMAT_12;
-		ClockTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-		ClockTime.StoreOperation = RTC_STOREOPERATION_RESET;
+//
+// Structure to set the time in the RTC
+//
+	ClockTime.Hours = 00;
+	ClockTime.Minutes = 00;
+	ClockTime.Seconds = 00;
+	ClockTime.SubSeconds = 0;
+	ClockTime.TimeFormat = RTC_HOURFORMAT_12;
+	ClockTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+	ClockTime.StoreOperation = RTC_STOREOPERATION_RESET;
 
-	//
-	// Structure to set the date in the RTC
-	//
+//
+// Structure to set the date in the RTC
+//
 
-	 	ClockDate.Date = 	21;
-		ClockDate.Month = 	RTC_MONTH_JUNE;
-		ClockDate.WeekDay = RTC_WEEKDAY_WEDNESDAY;
-		ClockDate.Year =	17;
+	ClockDate.Date = 	21;
+	ClockDate.Month = 	RTC_MONTH_JUNE;
+	ClockDate.WeekDay = RTC_WEEKDAY_WEDNESDAY;
+	ClockDate.Year =	17;
 
-	//
-	// Set the date and time in the RTC
-	//
+//
+// Set the date and time in the RTC
+//
 
-		HAL_RTC_SetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
-		HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
-
-
-
-		HAL_NVIC_SetPriority( RTC_Alarm_IRQn, 0, 0 );
-		HAL_NVIC_EnableIRQ( RTC_Alarm_IRQn );
+	HAL_RTC_SetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
+	HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
 
 
-	//
-	// Set the initial alarm time
-	//
-		ClockAlarm.Alarm = RTC_ALARM_A;
-		ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
-		ClockAlarm.AlarmTime.Hours = 0x00;
-		ClockAlarm.AlarmTime.Minutes = 0x00;
-		ClockAlarm.AlarmTime.Seconds = 0x05;
-		ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
-		ClockAlarm.AlarmDateWeekDay = 1;
-		HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
+
+	HAL_NVIC_SetPriority( RTC_Alarm_IRQn, 0, 0 );
+	HAL_NVIC_EnableIRQ( RTC_Alarm_IRQn );
+
+
+//
+// Set the initial alarm time
+//
+	ClockAlarm.Alarm = RTC_ALARM_A;
+	ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
+	ClockAlarm.AlarmTime.Hours = 0x00;
+	ClockAlarm.AlarmTime.Minutes = 0x00;
+	ClockAlarm.AlarmTime.Seconds = 0x05;
+	ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
+	ClockAlarm.AlarmDateWeekDay = 1;
+	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 }
 
-// ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic pop
 
