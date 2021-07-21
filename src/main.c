@@ -113,13 +113,14 @@ volatile int
 								  BUTTON_STAB_COUNT};
 
 volatile bool
-	ButtonsPushed[6];			// Bit field containing the bits of which buttons have been pushed
+	ButtonsPushed[6];		// Bit field containing the bits of which buttons have been pushed
+
+volatile bool ConfigFinished = FALSE;			// Flag to indicate config is finished
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
 	DisplayedDigit = 0,		// Current digit being displayed on the LED display
-
-							// Current format for the displayed time ( IE 12 or 24 hour format )
+	// Current format for the displayed time ( IE 12 or 24 hour format )
 	ClockHourFormat = CLOCK_HOUR_FORMAT_12,
 	AlarmPmFlag = 0,
 	TimePmFlag = 0;
@@ -181,6 +182,7 @@ int main(int argc, char* argv[])
 // Start the display timer (TIM5)
 //
 	__HAL_TIM_ENABLE( &DisplayTimer ); // Enable timer to start
+	ConfigFinished = TRUE;
 
 
 	while ( TRUE )
@@ -214,6 +216,12 @@ int main(int argc, char* argv[])
 
 void TIM5_IRQHandler(void)
 {
+	// Check that the board is set up (ie, that this is not a spurious interrupt)
+	if(!ConfigFinished){
+		// clear the timer interrupt flag
+		__HAL_TIM_CLEAR_FLAG( &DisplayTimer, TIM_IT_UPDATE );
+		return;
+	}
 
 //
 // Validate the correct interrupt has occurred
@@ -236,9 +244,9 @@ void TIM5_IRQHandler(void)
 //
 // Debug code
 //
-			trace_printf( "B1:%d B2:%d B3:%d B4:%d B5:%d B6:%d\n",
-					ButtonsPushed[0], ButtonsPushed[1], ButtonsPushed[2],
-					ButtonsPushed[3], ButtonsPushed[4], ButtonsPushed[5]);
+//			trace_printf( "B1:%d B2:%d B3:%d B4:%d B5:%d B6:%d\n",
+//					ButtonsPushed[0], ButtonsPushed[1], ButtonsPushed[2],
+//					ButtonsPushed[3], ButtonsPushed[4], ButtonsPushed[5]);
 
 			ProcessButtons();
 		}
@@ -434,33 +442,34 @@ void Snooze(void)
 
 void GetCurrentTime(void)
 {
-//	int hour_tens = 0, hours = 0, minute_tens = 0, minutes = 0;
-//	if ( HAL_RTC_WaitForSynchro( &RealTimeClock ) == HAL_OK ){
-//		// Update the time and date structures
-//		HAL_RTC_GetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
-//		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
-//
-//		// Extract the value to set each digit
-//		hours = ClockTime.Hours;
-//		while(hours >= 10){
-//			hours -= 10;
-//			hour_tens++;
-//		}
-//		minutes = ClockTime.Minutes;
-//		while(minutes >= 10){
-//			minutes -= 10;
-//			minute_tens++;
-//		}
-//	}
-//	// Set the digits in the BCDTime array
-//	BcdTime[0] = hour_tens;
-//	BcdTime[1] = hours;
-//	BcdTime[2] = minute_tens;
-//	BcdTime[3] = minutes;
-	BcdTime[0] = 1;
-	BcdTime[1] = 2;
-	BcdTime[2] = 3;
-	BcdTime[3] = 8;
+	int hour_tens = 0, hours = 0, minute_tens = 0, minutes = 0;
+	if ( HAL_RTC_WaitForSynchro( &RealTimeClock ) == HAL_OK ){
+		// Update the time and date structures
+		HAL_RTC_GetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
+		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
+
+		// Extract the value to set each digit
+		hours = ClockTime.Hours;
+		while(hours >= 10){
+			hours -= 10;
+			hour_tens++;
+		}
+		minutes = ClockTime.Minutes;
+		while(minutes >= 10){
+			minutes -= 10;
+			minute_tens++;
+		}
+	}
+	// Set the digits in the BCDTime array
+	BcdTime[0] = hour_tens;
+	BcdTime[1] = hours;
+	BcdTime[2] = minute_tens;
+	BcdTime[3] = minutes;
+	// Display Debug
+//	BcdTime[0] = 1;
+//	BcdTime[1] = 2;
+//	BcdTime[2] = 3;
+//	BcdTime[3] = 8;
 }
 
 
@@ -562,7 +571,6 @@ void SystemClock_Config( void )
 	if( HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK )
 	{
 		trace_printf( "HAL_RCC_OscConfig failed\r\n");
-		while( TRUE );
 	}
 
 	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
@@ -574,7 +582,6 @@ void SystemClock_Config( void )
 	if( HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK )
 	{
 		trace_printf( "HAL_RCC_ClockConfig failed\r\n");
-		while( TRUE );
 	}
 
 	PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
@@ -583,7 +590,6 @@ void SystemClock_Config( void )
 	if(HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
 	{
 		trace_printf( "HAL_RCCEx_PeriphCLKConfig failed\r\n");
-		while( TRUE );
 	}
 
 
@@ -616,15 +622,15 @@ void ConfigureIoPins( void ){
 //
 	__HAL_RCC_GPIOD_CLK_ENABLE(); // enabling clock for port D
 
-	GPIO_InitTypeDef GPIO_InitStructureD; // handle for pointing GPIO of port D
+	GPIO_InitTypeDef GPIOD_InitStructure; // handle for pointing GPIO of port D
 
-	GPIO_InitStructureD.Pin = PIN_ALL_BUTTONS;
-	GPIO_InitStructureD.Mode = GPIO_MODE_INPUT; // set mode to be input
-	GPIO_InitStructureD.Speed = GPIO_SPEED_FAST;
-	GPIO_InitStructureD.Pull = GPIO_PULLUP; // configure pull-up resistor
-	GPIO_InitStructureD.Alternate = 0;
+	GPIOD_InitStructure.Pin = PIN_ALL_BUTTONS;
+	GPIOD_InitStructure.Mode = GPIO_MODE_INPUT; // set mode to be input
+	GPIOD_InitStructure.Speed = GPIO_SPEED_FAST;
+	GPIOD_InitStructure.Pull = GPIO_PULLUP; // configure pull-up resistor
+	GPIOD_InitStructure.Alternate = 0;
 
-	HAL_GPIO_Init(GPIOD, &GPIO_InitStructureD);
+	HAL_GPIO_Init(GPIOD, &GPIOD_InitStructure);
 
 //
 // Configure port C pin 6 to act as Timer 5 (alternate function)
@@ -653,14 +659,15 @@ void ConfigureTimer( void )
 	DisplayTimer.Init.Prescaler = 8399;
 	DisplayTimer.Init.CounterMode = TIM_COUNTERMODE_UP;
 	DisplayTimer.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	HAL_TIM_Base_Init( &DisplayTimer );
+	if (HAL_TIM_Base_Init( &DisplayTimer ) != HAL_OK){
+		trace_printf("HAL_TIM_Base_Init failed\r\n");
+	}
 
 	HAL_NVIC_SetPriority( TIM5_IRQn, 0, 0); // set priority for the interrupt. Value 0 corresponds to highest priority
-	HAL_NVIC_EnableIRQ( TIM5_IRQn ); // Enable interrupt function request of Timer3
+	HAL_NVIC_EnableIRQ( TIM5_IRQn ); // Enable interrupt function request of Timer5
 
 	__HAL_TIM_ENABLE_IT( &DisplayTimer, TIM_IT_UPDATE ); // Enable timer interrupt flag to be set when timer count is reached
-	// Note: The timer has not been started yet, as doing so this early will
-	// cause an unhandled interrupt to occur.
+	// Note: The timer has not been started yet, to prevent spurious interrupts
 }
 
 void ConfigureRealTimeClock( void )
@@ -681,7 +688,6 @@ void ConfigureRealTimeClock( void )
 	if( HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK )
 	{
 		trace_printf( "HAL_RCC_OscConfig failed\r\n");
-		while( TRUE );
 	}
 
 //
@@ -692,7 +698,6 @@ void ConfigureRealTimeClock( void )
 	if(HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
 	{
 		trace_printf( "HAL_RCCEx_PeriphCLKConfig failed\r\n");
-		while( TRUE );
 	}
 
 //
@@ -765,14 +770,14 @@ void ConfigureRealTimeClock( void )
 //
 // Set the initial alarm time
 //
-	ClockAlarm.Alarm = RTC_ALARM_A;
-	ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
-	ClockAlarm.AlarmTime.Hours = 0x00;
-	ClockAlarm.AlarmTime.Minutes = 0x00;
-	ClockAlarm.AlarmTime.Seconds = 0x05;
-	ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
-	ClockAlarm.AlarmDateWeekDay = 1;
-	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
+//	ClockAlarm.Alarm = RTC_ALARM_A;
+//	ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
+//	ClockAlarm.AlarmTime.Hours = 0x00;
+//	ClockAlarm.AlarmTime.Minutes = 0x00;
+//	ClockAlarm.AlarmTime.Seconds = 0x05;
+//	ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
+//	ClockAlarm.AlarmDateWeekDay = 1;
+//	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 }
 
 
