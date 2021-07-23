@@ -110,12 +110,14 @@ volatile int
 								  BUTTON_STAB_COUNT,
 								  BUTTON_STAB_COUNT,
 								  BUTTON_STAB_COUNT,
-								  BUTTON_STAB_COUNT};
+								  BUTTON_STAB_COUNT},
+	button_slowdown_counter = 0;
 
 volatile bool
 	ButtonsPushed[6],		// Bit field containing the bits of which buttons have been pushed
 	ConfigFinished = FALSE,			// Flag to indicate config is finished
-	its_high_noon = true;	// Flag to tell if this is the first time 12 rolls around
+	its_high_noon = true,	// Flag to tell if this is the first time 12 rolls around
+	set_alarm_flag = false;
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -509,6 +511,7 @@ uint16_t CheckButtons( void )
 									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_4),
 									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_5),
 									HAL_GPIO_ReadPin(GPIOD, PIN_BUT_6)};
+	if(button_slowdown_counter != 0) button_slowdown_counter--;
 
 	for(unsigned char button = 0; button < 6; button++){
 		if (button_current_value[button] != ButtonsPushed[button]){
@@ -558,27 +561,32 @@ void ProcessButtons( void )
     bool Button5 = !ButtonsPushed[4];
     bool Button6 = !ButtonsPushed[5];
 
-
-    if (Button1){
-        SetTime();
+    if(button_slowdown_counter == 0){
+    	button_slowdown_counter = BUTTON_USABILITY_COUNT;
+		if (Button3){
+			set_alarm_flag = !set_alarm_flag;
+			//debug
+			trace_printf("Updated set alarm flag to %d\r\n", set_alarm_flag);
+		}
+		if (Button1 || Button2){
+			if(set_alarm_flag){
+				SetAlarm();
+			}
+			else{
+				SetTime();
+			}
+		}
+		if(Button4){
+			Snooze();
+		}
+		if(Button5){
+			Alarm = !Alarm;
+		}
+		if(Button6){
+		 // maybe use this to check what time the alarm is set for
+		}
     }
-    else if (Button2){
-        SetTime();
-    }
-    else if(Button3){
-    	// Pseudocode?
-        //setTime() = !setAlarm();
-    }
-    else if(Button4){
-        Snooze();
-    }
-    else if(Button5){
-        Alarm = !Alarm;
-    }
-    else if(Button6){
-     // maybe use this to check what time the alarm is set for
-    }
-
+    // Button slowdown counter is decremented elsewhere
 }
 
 

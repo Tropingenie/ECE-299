@@ -43,3 +43,7 @@
 // Number of "cycles" to wait before updating a button input (used to determine
 // a button value is stable while debouncing)
 #define BUTTON_STAB_COUNT 10
+
+// Number of "cycles" to wait before allowing another button input (used to make buttons
+// not go zoom)
+#define BUTTON_USABILITY_COUNT 30
