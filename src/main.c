@@ -113,9 +113,9 @@ volatile int
 								  BUTTON_STAB_COUNT};
 
 volatile bool
-	ButtonsPushed[6];		// Bit field containing the bits of which buttons have been pushed
-
-volatile bool ConfigFinished = FALSE;			// Flag to indicate config is finished
+	ButtonsPushed[6],		// Bit field containing the bits of which buttons have been pushed
+	ConfigFinished = FALSE,			// Flag to indicate config is finished
+	its_high_noon = true;	// Flag to tell if this is the first time 12 rolls around
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -363,10 +363,14 @@ void SetTime(void)
 		ClockTime.Minutes %= 60;
 
 		ClockTime.Hours++;
-		if ( ClockTime.Hours >= 12 )
+		if(ClockTime.Hours == 12 && its_high_noon){
+			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
+			its_high_noon = false;
+		}
+		if ( ClockTime.Hours > 12 )
 		{
 			ClockTime.Hours %= 12;
-			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
+			its_high_noon = true;
 		}
 	}
 
@@ -451,9 +455,14 @@ void GetCurrentTime(void)
 		HAL_RTC_GetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
 		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
 
-		if ( ClockTime.Hours >= 12 )
+		// The purpose of this is to toggle the TimePmFlag exactly once, once it flips over to 12
+		if ( ClockTime.Hours > 12 && its_high_noon)
 		{
 			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
+			its_high_noon = false;
+		}
+		else if ( ClockTime.Hours == 1 ){
+			its_high_noon = true;
 		}
 
 		// Extract the value to set each digit
@@ -533,16 +542,42 @@ uint16_t CheckButtons( void )
 
 
 /*
- * Function: ProcessButtons
- *
- * Description:
- *
- * Test for which button or buttons has been pressed and do the appropriate operation.
- *
+ * Button 1: advance minute
+ * Button 2: advance hours
+ * Button 3: toggle between alarm
+ * Button 4: Snooze
+ * Button 5: toggle alarm
+ * Button 6: potentially show alarm
  */
-
 void ProcessButtons( void )
 {
+    bool Button1 = !ButtonsPushed[0];
+    bool Button2 = !ButtonsPushed[1];
+    bool Button3 = !ButtonsPushed[2];
+    bool Button4 = !ButtonsPushed[3];
+    bool Button5 = !ButtonsPushed[4];
+    bool Button6 = !ButtonsPushed[5];
+
+
+    if (Button1){
+        SetTime();
+    }
+    else if (Button2){
+        SetTime();
+    }
+    else if(Button3){
+    	// Pseudocode?
+        //setTime() = !setAlarm();
+    }
+    else if(Button4){
+        Snooze();
+    }
+    else if(Button5){
+        Alarm = !Alarm;
+    }
+    else if(Button6){
+     // maybe use this to check what time the alarm is set for
+    }
 
 }
 
