@@ -456,9 +456,9 @@ void GetCurrentTime(void)
 		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
 
 		// The purpose of this is to toggle the TimePmFlag exactly once, once it flips over to 12
-		if ( ClockTime.Hours > 12 && its_high_noon)
+		if ( ClockTime.Hours == 12 && its_high_noon)
 		{
-			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
+			TimePmFlag = !TimePmFlag;// Toggle the AM/PM flag
 			its_high_noon = false;
 		}
 		else if ( ClockTime.Hours == 1 ){
@@ -544,7 +544,7 @@ uint16_t CheckButtons( void )
 /*
  * Button 1: advance minute
  * Button 2: advance hours
- * Button 3: toggle between alarm
+ * Button 3: toggle between setting alarm or time
  * Button 4: Snooze
  * Button 5: toggle alarm
  * Button 6: potentially show alarm
