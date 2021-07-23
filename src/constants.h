@@ -17,11 +17,12 @@
 #define PIN_E GPIO_PIN_7
 #define PIN_F GPIO_PIN_8
 #define PIN_G GPIO_PIN_9
+#define PIN_ALARM GPIO_PIN_15 // ALARM LED is only present in simulated clock
 // Define some additional names (L pins
 #define PIN_L1 PIN_A
 #define PIN_L2 PIN_B
 #define PIN_L3 PIN_C
-#define PIN_ALL_SEGMENTS (PIN_A | PIN_B | PIN_C | PIN_D | PIN_E | PIN_F | PIN_G)
+#define PIN_ALL_SEGMENTS (PIN_A | PIN_B | PIN_C | PIN_D | PIN_E | PIN_F | PIN_G | PIN_ALARM)
 // Define pins for digit selection
 #define PIN_DIG_1 GPIO_PIN_10
 #define PIN_DIG_2 GPIO_PIN_11

@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "diag/trace.h"
 #include "stm32f4xx.h"
 #include "constants.h"
@@ -18,10 +19,13 @@
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
-extern inline void display_number(const int n){
+extern int TimePmFlag;
 
-	// First, reset the display
+extern inline void clear_segments( void ){
 	HAL_GPIO_WritePin( GPIOE, PIN_ALL_SEGMENTS, GPIO_PIN_RESET );
+}
+
+extern inline void display_number(const int n){
 
 	switch (n){
 	case 0:
@@ -95,7 +99,10 @@ extern inline void display_number(const int n){
 	case COLON:
 		HAL_GPIO_WritePin( GPIOE, PIN_L1, GPIO_PIN_SET);
 		HAL_GPIO_WritePin( GPIOE, PIN_L2, GPIO_PIN_SET);
-
+		if(TimePmFlag){
+			HAL_GPIO_WritePin( GPIOE, PIN_L3, GPIO_PIN_SET );
+		}
+		break;
 	}
 }
 
@@ -123,33 +130,5 @@ extern inline void show_digit(const int n){
 	}
 }
 
-// Probably not needed due to showing each digit in the framework code
-//void show_time(int h1, int h2, int m1, int m2){
-//	hide_digits();
-//	display_number(h1);
-//	show_digit(1);
-//	HAL_Delay(DELAY);
-//
-//	hide_digits();
-//	display_number(h2);
-//	show_digit(2);
-//	HAL_Delay(DELAY);
-//
-//	hide_digits();
-//	display_number(m1);
-//	show_digit(3);
-//	HAL_Delay(DELAY);
-//
-//	hide_digits();
-//	display_number(m2);
-//	show_digit(4);
-//	HAL_Delay(DELAY);
-//
-//	// Show the colon (L1 and L2)
-//	hide_digits();
-//	display_number(SEG_L);
-//	show_digit(SEG_L);
-//	HAL_Delay(DELAY);
-//}
 
 #pragma GCC diagnostic pop

@@ -315,7 +315,8 @@ void Display7Segment(void)
 //
 // clear segment selection bits
 //
-	// (Done as part of display_number function)
+
+	clear_segments();
 
 //
 // Select current digit
@@ -332,7 +333,7 @@ void Display7Segment(void)
 	else{
 		ValueToDisplay = BcdTime[DisplayedDigit];
 	}
-	display_number(ValueToDisplay);
+	display_number(ValueToDisplay, TimePmFlag);
 //
 // Advance to the next digit to be display on next interrupt
 //
@@ -365,8 +366,10 @@ void SetTime(void)
 		if ( ClockTime.Hours >= 12 )
 		{
 			ClockTime.Hours %= 12;
+			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
 		}
 	}
+
 	HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
 }
 
@@ -447,6 +450,11 @@ void GetCurrentTime(void)
 		// Update the time and date structures
 		HAL_RTC_GetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
 		HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
+
+		if ( ClockTime.Hours >= 12 )
+		{
+			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
+		}
 
 		// Extract the value to set each digit
 		hours = ClockTime.Hours;
@@ -710,7 +718,7 @@ void ConfigureRealTimeClock( void )
 //
 
 	RealTimeClock.Instance = RTC;
-	RealTimeClock.Init.HourFormat = RTC_HOURFORMAT_24;
+	RealTimeClock.Init.HourFormat = RTC_HOURFORMAT_12;
 
 	RealTimeClock.Init.AsynchPrediv = 127;
 	RealTimeClock.Init.SynchPrediv = 0xFF;
@@ -737,11 +745,11 @@ void ConfigureRealTimeClock( void )
 //
 // Structure to set the time in the RTC
 //
-	ClockTime.Hours = 00;
-	ClockTime.Minutes = 00;
-	ClockTime.Seconds = 00;
+	ClockTime.Hours = 11;
+	ClockTime.Minutes = 59;
+	ClockTime.Seconds = 55;
 	ClockTime.SubSeconds = 0;
-	ClockTime.TimeFormat = RTC_HOURFORMAT_12;
+	ClockTime.TimeFormat = RTC_HOURFORMAT12_AM;
 	ClockTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
 	ClockTime.StoreOperation = RTC_STOREOPERATION_RESET;
 
