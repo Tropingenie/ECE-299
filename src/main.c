@@ -136,7 +136,7 @@ void ConfigureDisplay( void )
 
 
 int main(int argc, char* argv[])
-{
+ {
 
 //
 // Reset of all peripherals, Initializes the Flash interface and the System timer.
@@ -258,6 +258,7 @@ void TIM5_IRQHandler(void)
 //
 		__HAL_TIM_CLEAR_FLAG( &DisplayTimer, TIM_IT_UPDATE );
     }
+
 }
 
 
@@ -344,6 +345,13 @@ void Display7Segment(void)
 	}
 	else{
 		DisplayedDigit++;
+	}
+
+	if(Alarm == TRUE){
+		HAL_GPIO_WritePin(GPIOE, PIN_ALARM, 1);
+	}
+	else{
+		HAL_GPIO_WritePin(GPIOE, PIN_ALARM, 0);
 	}
 }
 
@@ -721,6 +729,8 @@ void ConfigureTimer( void )
 	// Note: The timer has not been started yet, to prevent spurious interrupts
 }
 
+
+
 void ConfigureRealTimeClock( void )
 {
 	RCC_OscInitTypeDef
@@ -821,18 +831,20 @@ void ConfigureRealTimeClock( void )
 //
 // Set the initial alarm time
 //
-//	ClockAlarm.Alarm = RTC_ALARM_A;
-//	ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
-//	ClockAlarm.AlarmTime.Hours = 0x00;
-//	ClockAlarm.AlarmTime.Minutes = 0x00;
-//	ClockAlarm.AlarmTime.Seconds = 0x05;
-//	ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
-//	ClockAlarm.AlarmDateWeekDay = 1;
-//	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
+	ClockAlarm.Alarm = RTC_ALARM_A;
+	ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
+	ClockAlarm.AlarmTime.Hours = 12;
+	ClockAlarm.AlarmTime.Minutes = 00;
+	ClockAlarm.AlarmTime.Seconds = 00;
+	ClockAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
+	ClockAlarm.AlarmDateWeekDay = 1;
+
+	// sets the alarm in RTC
+	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
+
 }
 
 
 #pragma GCC diagnostic pop
 
 // ----------------------------------------------------------------------------
-
