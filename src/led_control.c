@@ -103,6 +103,9 @@ extern inline void display_number(const int n){
 			HAL_GPIO_WritePin( GPIOE, PIN_L3, GPIO_PIN_SET );
 		}
 		break;
+	case BLANK_DIGIT:
+		// Show nothing
+		break;
 	}
 }
 

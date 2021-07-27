@@ -124,19 +124,20 @@ volatile bool
 	alarm_ampm_toggle = true, // Flag to tell whether alarm is set for AM/PM
 	show_pm_flag, // Flag used by the display functions to determine if AM/PM indicator should be on
 	cache_original_alarm = true,
-	alarm_enabled = false;
+	alarm_enabled = false,
+	AlarmPmFlag = false,
+	TimePmFlag = false;
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
 	DisplayedDigit = 0,		// Current digit being displayed on the LED display
 	// Current format for the displayed time ( IE 12 or 24 hour format )
-	ClockHourFormat = CLOCK_HOUR_FORMAT_12,
-	AlarmPmFlag = 0,
-	TimePmFlag = 0;
+	ClockHourFormat = CLOCK_HOUR_FORMAT_12;
 
 volatile struct{
-	int hours;
-	int minutes;
+	uint8_t hours;
+	uint8_t minutes;
+	uint8_t time_format;
 }OriginalAlarm;
 
 void ConfigureDisplay( void )
@@ -310,6 +311,7 @@ void RTC_Alarm_IRQHandler(void)
     	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BCD );
 
     	Alarm = TRUE;
+    	trace_printf("Completed RTC_Alarm_IRQHandler\r\n");
 
 	}
 }
@@ -352,6 +354,9 @@ void Display7Segment(void)
 	else{
 		ValueToDisplay = BcdTime[DisplayedDigit];
 	}
+	if(ValueToDisplay == 0 && DisplayedDigit == 0){
+		ValueToDisplay = BLANK_DIGIT;
+	}
 	display_number(ValueToDisplay);
 //
 // Advance to the next digit to be display on next interrupt
@@ -363,6 +368,9 @@ void Display7Segment(void)
 		DisplayedDigit++;
 	}
 
+//
+// Separate from the rest of the display, turn the alarm on or off if needed
+//
 	if(Alarm == TRUE){
 		HAL_GPIO_WritePin(GPIOE, PIN_ALARM, 1);
 	}
@@ -449,7 +457,9 @@ void Snooze(void)
 			if(cache_original_alarm){
 				OriginalAlarm.hours = ClockAlarm.AlarmTime.Hours;
 				OriginalAlarm.minutes = ClockAlarm.AlarmTime.Minutes;
+				OriginalAlarm.time_format = ClockAlarm.AlarmTime.TimeFormat;
 				cache_original_alarm = false;
+				trace_printf("Cached alarm time of %02d:%02d\r\n", OriginalAlarm.hours, OriginalAlarm.minutes);
 			}
 
 			ClockAlarm.AlarmTime.Hours = ClockTime.Hours;
@@ -463,6 +473,7 @@ void Snooze(void)
 				}
 			}
 
+			trace_printf("Snoozed the alarm. Next alarm is at %02d:%02d\r\n", ClockAlarm.AlarmTime.Hours, ClockAlarm.AlarmTime.Minutes);
 			HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 		}
 	}
@@ -481,17 +492,11 @@ void Sleep(void){
 		if(!cache_original_alarm){
 			ClockAlarm.AlarmTime.Hours = OriginalAlarm.hours;
 			ClockAlarm.AlarmTime.Minutes = OriginalAlarm.minutes;
+			ClockAlarm.AlarmTime.TimeFormat = OriginalAlarm.time_format;
 			cache_original_alarm = true;
 		}
 
-		if ( ClockAlarm.AlarmTime.Minutes >= 60 ){
-			ClockAlarm.AlarmTime.Minutes %= 60;
-			ClockAlarm.AlarmTime.Hours++;
-			if ( ClockAlarm.AlarmTime.Hours >= 12 ){
-				ClockAlarm.AlarmTime.Hours %= 12;
-			}
-		}
-
+		trace_printf("Resetting alarm to %02d:%02d\r\n", ClockAlarm.AlarmTime.Hours, ClockAlarm.AlarmTime.Minutes);
 		HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 	}
 }
@@ -514,6 +519,7 @@ void ToggleAlarm(void){
 		HAL_NVIC_EnableIRQ( RTC_Alarm_IRQn );
 	}
 	alarm_enabled = !alarm_enabled;
+	trace_printf("alarm_enabled flag set to %d\r\n", alarm_enabled);
 }
 
 
@@ -664,6 +670,7 @@ uint16_t CheckButtons( void )
  */
 void ProcessButtons( void )
 {
+	// Buttons are low true so we alias them here for readability
     bool Button1 = !ButtonsPushed[0];
     bool Button2 = !ButtonsPushed[1];
     bool Button3 = !ButtonsPushed[2];

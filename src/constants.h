@@ -6,7 +6,9 @@
 #define TRUE	( 1 == 1 )
 #define FALSE	( 1 == 0 )
 
+// Arbitrary constants to use in led control functions
 #define COLON 10
+#define BLANK_DIGIT 11
 
 // LED segments and digit control pins should all be on GPIOE
 // Define pins for segment selection
