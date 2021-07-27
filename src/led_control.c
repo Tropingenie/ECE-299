@@ -19,7 +19,7 @@
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
-extern int TimePmFlag;
+extern int show_pm_flag;
 
 extern inline void clear_segments( void ){
 	HAL_GPIO_WritePin( GPIOE, PIN_ALL_SEGMENTS, GPIO_PIN_RESET );
@@ -99,7 +99,7 @@ extern inline void display_number(const int n){
 	case COLON:
 		HAL_GPIO_WritePin( GPIOE, PIN_L1, GPIO_PIN_SET);
 		HAL_GPIO_WritePin( GPIOE, PIN_L2, GPIO_PIN_SET);
-		if(TimePmFlag){
+		if(show_pm_flag){
 			HAL_GPIO_WritePin( GPIOE, PIN_L3, GPIO_PIN_SET );
 		}
 		break;

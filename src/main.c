@@ -63,6 +63,7 @@ void
 	Snooze( void ),
 	ProcessButtons( void ),
 	GetCurrentTime( void ),
+	GetCurrentAlarm( void ),
 	SystemClock_Config( void ),
 	ConfigureIoPins( void ),
 	ConfigureTimer( void ),
@@ -117,7 +118,9 @@ volatile bool
 	ButtonsPushed[6],		// Bit field containing the bits of which buttons have been pushed
 	ConfigFinished = FALSE,			// Flag to indicate config is finished
 	its_high_noon = true,	// Flag to tell if this is the first time 12 rolls around
-	set_alarm_flag = false;
+	set_alarm_flag = false,
+	alarm_ampm_toggle = true, // Flag to tell whether alarm is set for AM/PM
+	show_pm_flag; // Flag used by the display functions to determine if AM/PM indicator should be on
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -234,6 +237,7 @@ void TIM5_IRQHandler(void)
 
 
 		GetCurrentTime();
+//		GetCurrentAlarm();
 
 		Display7Segment();
 
@@ -336,7 +340,7 @@ void Display7Segment(void)
 	else{
 		ValueToDisplay = BcdTime[DisplayedDigit];
 	}
-	display_number(ValueToDisplay, TimePmFlag);
+	display_number(ValueToDisplay);
 //
 // Advance to the next digit to be display on next interrupt
 //
@@ -492,11 +496,44 @@ void GetCurrentTime(void)
 	BcdTime[1] = hours;
 	BcdTime[2] = minute_tens;
 	BcdTime[3] = minutes;
+	show_pm_flag = TimePmFlag;
 	// Display Debug
 //	BcdTime[0] = 1;
 //	BcdTime[1] = 2;
 //	BcdTime[2] = 3;
 //	BcdTime[3] = 8;
+}
+
+void GetCurrentAlarm(void){
+
+    int hour_tens = 0, AlarmHours = 0, minute_tens = 0, AlarmMinutes = 0;
+    if (ClockAlarm.AlarmTime.Hours == 12 && alarm_ampm_toggle){
+        // toggle AlarmPmFlag
+        AlarmPmFlag = !AlarmPmFlag;
+        alarm_ampm_toggle = false;
+    }
+
+    else if (ClockAlarm.AlarmTime.Hours == 1){
+        alarm_ampm_toggle = true;
+        }
+
+    AlarmHours = ClockAlarm.AlarmTime.Hours;
+    while(AlarmHours >= 10){
+            AlarmHours -= 10;
+            hour_tens++;
+        }
+    AlarmMinutes = ClockAlarm.AlarmTime.Minutes;
+    while(AlarmMinutes >= 10){
+            AlarmMinutes -= 10;
+            minute_tens++;
+        }
+    // Set the digits in the BCDTime array
+        BcdTime[0] = hour_tens;
+        BcdTime[1] = AlarmHours;
+        BcdTime[2] = minute_tens;
+        BcdTime[3] = AlarmMinutes;
+        show_pm_flag = AlarmPmFlag;
+
 }
 
 

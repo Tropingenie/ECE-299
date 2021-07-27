@@ -2,7 +2,7 @@
 
 void
 	clear_segments( void ),
-	display_number(const int n, const bool pm),
+	display_number(const int n),
 	hide_digits(void),
 	show_digit(const int n)
 ;
