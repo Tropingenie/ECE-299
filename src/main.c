@@ -126,7 +126,9 @@ volatile bool
 	cache_original_alarm = true,
 	alarm_enabled = false,
 	AlarmPmFlag = false,
-	TimePmFlag = false;
+	TimePmFlag = false,
+    setMinutes = false,
+    setHours = false;
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -391,24 +393,40 @@ void Display7Segment(void)
 
 void SetTime(void)
 {
-	ClockTime.Minutes++;
-	if ( ClockTime.Minutes >= 60 )
-	{
-		ClockTime.Minutes %= 60;
+    if (setMinutes == true){
+        ClockTime.Minutes++;
+    }
+    if (setHours == true){
+        ClockTime.Hours++;
+    }
 
-		ClockTime.Hours++;
-		if(ClockTime.Hours == 12 && its_high_noon){
-			TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
-			its_high_noon = false;
+    trace_printf("Set time to %02d:%02d, which is ", ClockTime.Hours, ClockTime.Minutes);
+
+    // These all must be non-nested if statements for validation to work
+    if ( ClockTime.Minutes >= 60 )
+    {
+        ClockTime.Minutes %= 60;
+
+        ClockTime.Hours++;
+    }
+	if(ClockTime.Hours == 12 && its_high_noon){
+		TimePmFlag = !TimePmFlag;//Toggle the AM/PM flag
+		its_high_noon = false;
+		if(TimePmFlag){
+			ClockTime.TimeFormat = RTC_HOURFORMAT12_PM;
 		}
-		if ( ClockTime.Hours > 12 )
-		{
-			ClockTime.Hours %= 12;
-			its_high_noon = true;
+		else{
+			ClockTime.TimeFormat = RTC_HOURFORMAT12_AM;
 		}
 	}
+	if ( ClockTime.Hours > 12 )
+	{
+		ClockTime.Hours %= 12;
+		its_high_noon = true;
+	}
+    trace_printf("%02d:%02d after validation steps.\r\n", ClockTime.Hours, ClockTime.Minutes);
 
-	HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
+    HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
 }
 
 /*
@@ -422,16 +440,33 @@ void SetTime(void)
 
 void SetAlarm(void)
 {
-	ClockAlarm.AlarmTime.Minutes++;
-	if ( ClockAlarm.AlarmTime.Minutes >= 60 ){
-		ClockAlarm.AlarmTime.Minutes %= 60;
+    if (setMinutes == true){
+        ClockAlarm.AlarmTime.Minutes++;
+    }
+    if (setHours == true){
+        ClockAlarm.AlarmTime.Hours++;
+    }
 
-		ClockAlarm.AlarmTime.Hours++;
-		if ( ClockAlarm.AlarmTime.Hours >= 12 ){
-			ClockAlarm.AlarmTime.Hours %= 12;
+    // These all must be non-nested if statements for validation to work
+    if ( ClockAlarm.AlarmTime.Minutes >= 60 ){
+        ClockAlarm.AlarmTime.Minutes %= 60;
+        ClockAlarm.AlarmTime.Hours++;
+    }
+	if(ClockAlarm.AlarmTime.Hours == 12 && alarm_ampm_toggle){
+		AlarmPmFlag = !AlarmPmFlag;//Toggle the AM/PM flag
+		alarm_ampm_toggle = false;
+		if(AlarmPmFlag){
+			ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_PM;
+		}
+		else{
+			ClockAlarm.AlarmTime.TimeFormat = RTC_HOURFORMAT12_AM;
 		}
 	}
-	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
+	if ( ClockAlarm.AlarmTime.Hours > 12 ){
+		ClockAlarm.AlarmTime.Hours %= 12;
+		alarm_ampm_toggle = true;
+	}
+    HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 }
 
 
@@ -689,6 +724,20 @@ void ProcessButtons( void )
 			set_alarm_flag = false;
 		}
 		if (Button1 || Button2){
+
+			if(Button1){
+				setMinutes = true;
+				setHours = false;
+			}
+			else if (Button2){
+				setHours = true;
+				setMinutes = false;
+			}
+			else{
+				setHours = false;
+				setMinutes = false;
+			}
+
 			if(set_alarm_flag){
 				SetAlarm();
 			}
