@@ -62,6 +62,7 @@ void
 	SetAlarm( void ),
 	Snooze( void ),
 	Sleep (void ),
+	ToggleAlarm( void ),
 	ProcessButtons( void ),
 	GetCurrentTime( void ),
 	GetCurrentAlarm( void ),
@@ -122,7 +123,8 @@ volatile bool
 	set_alarm_flag = false,
 	alarm_ampm_toggle = true, // Flag to tell whether alarm is set for AM/PM
 	show_pm_flag, // Flag used by the display functions to determine if AM/PM indicator should be on
-	cache_original_alarm = true;
+	cache_original_alarm = true,
+	alarm_enabled = false;
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -494,6 +496,26 @@ void Sleep(void){
 	}
 }
 
+/*
+ * Function: ToggleAlarm
+ *
+ * Description:
+ *
+ * Toggles the alarm interrupt request on and off
+ */
+void ToggleAlarm(void){
+	if(alarm_enabled){
+		HAL_NVIC_DisableIRQ( RTC_Alarm_IRQn );
+		if(Alarm == true){
+			Sleep();
+		}
+	}
+	else{
+		HAL_NVIC_EnableIRQ( RTC_Alarm_IRQn );
+	}
+	alarm_enabled = !alarm_enabled;
+}
+
 
 /*
  * Function: GetCurrentTime
@@ -674,7 +696,7 @@ void ProcessButtons( void )
 			Sleep();
 		}
 		if(Button6){
-		 // maybe use this to check what time the alarm is set for
+			ToggleAlarm();
 		}
     }
     // Button slowdown counter is decremented elsewhere
@@ -909,6 +931,7 @@ void ConfigureRealTimeClock( void )
 
 	HAL_NVIC_SetPriority( RTC_Alarm_IRQn, 0, 0 );
 	HAL_NVIC_EnableIRQ( RTC_Alarm_IRQn );
+	alarm_enabled = true;
 
 
 //
