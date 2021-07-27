@@ -235,9 +235,12 @@ void TIM5_IRQHandler(void)
 	if( __HAL_TIM_GET_FLAG( &DisplayTimer, TIM_IT_UPDATE ) != RESET )
 	{
 
-
-		GetCurrentTime();
-//		GetCurrentAlarm();
+		if(!set_alarm_flag){
+			GetCurrentTime();
+		}
+		else{
+			GetCurrentAlarm();
+		}
 
 		Display7Segment();
 
@@ -611,7 +614,7 @@ void ProcessButtons( void )
 		if (Button3){
 			set_alarm_flag = !set_alarm_flag;
 			//debug
-			trace_printf("Updated set alarm flag to %d\r\n", set_alarm_flag);
+//			trace_printf("Updated set alarm flag to %d\r\n", set_alarm_flag);
 		}
 		if (Button1 || Button2){
 			if(set_alarm_flag){
