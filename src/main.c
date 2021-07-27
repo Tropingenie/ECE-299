@@ -313,7 +313,7 @@ void RTC_Alarm_IRQHandler(void)
     	HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BCD );
 
     	Alarm = TRUE;
-    	trace_printf("Completed RTC_Alarm_IRQHandler\r\n");
+//    	trace_printf("Completed RTC_Alarm_IRQHandler\r\n");
 
 	}
 }
@@ -400,7 +400,7 @@ void SetTime(void)
         ClockTime.Hours++;
     }
 
-    trace_printf("Set time to %02d:%02d, which is ", ClockTime.Hours, ClockTime.Minutes);
+//    trace_printf("Set time to %02d:%02d, which is ", ClockTime.Hours, ClockTime.Minutes);
 
     // These all must be non-nested if statements for validation to work
     if ( ClockTime.Minutes >= 60 )
@@ -424,7 +424,7 @@ void SetTime(void)
 		ClockTime.Hours %= 12;
 		its_high_noon = true;
 	}
-    trace_printf("%02d:%02d after validation steps.\r\n", ClockTime.Hours, ClockTime.Minutes);
+//    trace_printf("%02d:%02d after validation steps.\r\n", ClockTime.Hours, ClockTime.Minutes);
 
     HAL_RTC_SetTime(&RealTimeClock, &ClockTime, RTC_FORMAT_BIN);
 }
