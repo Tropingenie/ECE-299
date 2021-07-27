@@ -652,9 +652,12 @@ void ProcessButtons( void )
     if(button_slowdown_counter == 0){
     	button_slowdown_counter = BUTTON_USABILITY_COUNT;
 		if (Button3){
-			set_alarm_flag = !set_alarm_flag;
+			set_alarm_flag = true;
 			//debug
 //			trace_printf("Updated set alarm flag to %d\r\n", set_alarm_flag);
+		}
+		else{
+			set_alarm_flag = false;
 		}
 		if (Button1 || Button2){
 			if(set_alarm_flag){
@@ -668,7 +671,7 @@ void ProcessButtons( void )
 			Snooze();
 		}
 		if(Button5){
-			Alarm = !Alarm;
+			Sleep();
 		}
 		if(Button6){
 		 // maybe use this to check what time the alarm is set for
