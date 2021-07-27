@@ -61,6 +61,7 @@ void
 	SetTime( void ),
 	SetAlarm( void ),
 	Snooze( void ),
+	Sleep (void ),
 	ProcessButtons( void ),
 	GetCurrentTime( void ),
 	GetCurrentAlarm( void ),
@@ -120,7 +121,8 @@ volatile bool
 	its_high_noon = true,	// Flag to tell if this is the first time 12 rolls around
 	set_alarm_flag = false,
 	alarm_ampm_toggle = true, // Flag to tell whether alarm is set for AM/PM
-	show_pm_flag; // Flag used by the display functions to determine if AM/PM indicator should be on
+	show_pm_flag, // Flag used by the display functions to determine if AM/PM indicator should be on
+	cache_original_alarm = true;
 
 volatile int
 	BcdTime[4],				// Array to hold the hours and minutes in BCD format
@@ -129,6 +131,11 @@ volatile int
 	ClockHourFormat = CLOCK_HOUR_FORMAT_12,
 	AlarmPmFlag = 0,
 	TimePmFlag = 0;
+
+volatile struct{
+	int hours;
+	int minutes;
+}OriginalAlarm;
 
 void ConfigureDisplay( void )
 {
@@ -437,9 +444,14 @@ void Snooze(void)
 			HAL_RTC_GetDate(&RealTimeClock, &ClockDate, RTC_FORMAT_BIN);
 
 			//trace_printf("Time: %02d:%02d:%02d\n", ClockTime.Hours, ClockTime.Minutes, ClockTime.Seconds);
+			if(cache_original_alarm){
+				OriginalAlarm.hours = ClockAlarm.AlarmTime.Hours;
+				OriginalAlarm.minutes = ClockAlarm.AlarmTime.Minutes;
+				cache_original_alarm = false;
+			}
 
 			ClockAlarm.AlarmTime.Hours = ClockTime.Hours;
-			ClockAlarm.AlarmTime.Minutes = ClockTime.Minutes += 10;
+			ClockAlarm.AlarmTime.Minutes = ClockTime.Minutes += 1;
 
 			if ( ClockAlarm.AlarmTime.Minutes >= 60 ){
 				ClockAlarm.AlarmTime.Minutes %= 60;
@@ -451,6 +463,34 @@ void Snooze(void)
 
 			HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 		}
+	}
+}
+
+/*
+ * Function: Sleep
+ *
+ * Description:
+ *
+ * Reset the alarm to the original time, so that it will go off in 24 hours
+ */
+void Sleep(void){
+	if ( TRUE == Alarm ){
+		Alarm = FALSE;
+		if(!cache_original_alarm){
+			ClockAlarm.AlarmTime.Hours = OriginalAlarm.hours;
+			ClockAlarm.AlarmTime.Minutes = OriginalAlarm.minutes;
+			cache_original_alarm = true;
+		}
+
+		if ( ClockAlarm.AlarmTime.Minutes >= 60 ){
+			ClockAlarm.AlarmTime.Minutes %= 60;
+			ClockAlarm.AlarmTime.Hours++;
+			if ( ClockAlarm.AlarmTime.Hours >= 12 ){
+				ClockAlarm.AlarmTime.Hours %= 12;
+			}
+		}
+
+		HAL_RTC_SetAlarm_IT( &RealTimeClock, &ClockAlarm, RTC_FORMAT_BIN );
 	}
 }
 
@@ -595,7 +635,7 @@ uint16_t CheckButtons( void )
 /*
  * Button 1: advance minute
  * Button 2: advance hours
- * Button 3: toggle between setting alarm or time
+ * Button 3: toggle between setting alarm or time as well as which is shown on the display
  * Button 4: Snooze
  * Button 5: toggle alarm
  * Button 6: potentially show alarm
